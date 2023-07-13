@@ -10,6 +10,7 @@
 #include "focaltech.h"
 #include "dac5571.h"
 #include "stk8baxx.h"
+#include "RTClib.h"
 
 #define GFX_BL   -1 // default backlight pin, you may replace DF_GFX_BL to actual backlight pin
 #define PIN_RST  8
@@ -52,6 +53,10 @@ Arduino_GFX *gfx = new Arduino_ILI9488_18bit(bus, PIN_RST /* RST */, 1 /* rotati
 FocalTech_Class touch;
 
 STK8xxx stk8xxx;
+
+RTC_PCF8563 rtc;
+
+char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
 static int jpegDrawCallback(JPEGDRAW *pDraw)
 {
@@ -103,6 +108,17 @@ void setup() {
 
   stk8xxx.STK8xxx_Initialization();
 
+  if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    Serial.flush();
+    while (1) delay(10);
+  }
+  if (rtc.lostPower()) {
+    Serial.println("RTC is NOT initialized, let's set the time!");
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  }
+  rtc.start();
+
   Serial.println("End Setup\n");
 
 
@@ -119,6 +135,50 @@ void getGSensorData(float *X_DataOut, float *Y_DataOut, float *Z_DataOut)
     *Y_DataOut = 0;
     *Z_DataOut = 0;
     stk8xxx.STK8xxx_Getregister_data(X_DataOut, Y_DataOut, Z_DataOut);
+}
+
+void rtctest() {
+  DateTime now = rtc.now();
+
+  Serial.print(now.year(), DEC);
+  Serial.print('/');
+  Serial.print(now.month(), DEC);
+  Serial.print('/');
+  Serial.print(now.day(), DEC);
+  Serial.print(" (");
+  Serial.print(daysOfTheWeek[now.dayOfTheWeek()]);
+  Serial.print(") ");
+  Serial.print(now.hour(), DEC);
+  Serial.print(':');
+  Serial.print(now.minute(), DEC);
+  Serial.print(':');
+  Serial.print(now.second(), DEC);
+  Serial.println();
+
+  Serial.print(" since midnight 1/1/1970 = ");
+  Serial.print(now.unixtime());
+  Serial.print("s = ");
+  Serial.print(now.unixtime() / 86400L);
+  Serial.println("d");
+
+  // calculate a date which is 7 days, 12 hours and 30 seconds into the future
+  DateTime future (now + TimeSpan(7,12,30,6));
+
+  Serial.print(" now + 7d + 12h + 30m + 6s: ");
+  Serial.print(future.year(), DEC);
+  Serial.print('/');
+  Serial.print(future.month(), DEC);
+  Serial.print('/');
+  Serial.print(future.day(), DEC);
+  Serial.print(' ');
+  Serial.print(future.hour(), DEC);
+  Serial.print(':');
+  Serial.print(future.minute(), DEC);
+  Serial.print(':');
+  Serial.print(future.second(), DEC);
+  Serial.println();
+
+  Serial.println();
 }
 
 void loop() {
@@ -147,8 +207,10 @@ void loop() {
   // setVoltage(sineLookupTable[dacpos1 & 0x7F],DAC_ADDR_1);
   // delay(20);  
   // setVoltage(sineLookupTable[dacpos2 & 0x7F],DAC_ADDR_2);
-  float x,y,z;
-  getGSensorData(&x,&y,&z);
-  Serial.printf("X:%f - Y:%f - Z:%f\n", x,y,z);
-  delay(20);  
+  // float x,y,z;
+  // getGSensorData(&x,&y,&z);
+  // Serial.printf("X:%f - Y:%f - Z:%f\n", x,y,z);
+
+  rtctest();
+  delay(2000);  
 }
