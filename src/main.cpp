@@ -9,6 +9,7 @@
 #include "JpegFunc.h"
 #include "focaltech.h"
 #include "dac5571.h"
+#include "stk8baxx.h"
 
 #define GFX_BL   -1 // default backlight pin, you may replace DF_GFX_BL to actual backlight pin
 #define PIN_RST  8
@@ -49,6 +50,8 @@ Arduino_DataBus *bus = new Arduino_ESP32SPI(PIN_DC, PIN_CS, PIN_SCK, PIN_MOSI, P
 Arduino_GFX *gfx = new Arduino_ILI9488_18bit(bus, PIN_RST /* RST */, 1 /* rotation */, false /* IPS */);
 
 FocalTech_Class touch;
+
+STK8xxx stk8xxx;
 
 static int jpegDrawCallback(JPEGDRAW *pDraw)
 {
@@ -91,12 +94,14 @@ void setup() {
              0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
     Serial.printf("Time used: %lu\n", millis() - start);
   }
-  Wire.begin(2, 1, 1000000);
+  Wire.begin(2, 1, 400000);
   // Serial.println("\nStart Touch:\n");
   // Serial.printf("Touch Init: %i\n", touch.begin(Wire, FOCALTECH_SLAVE_ADDRESS));
   // Serial.printf("Touch MonitorTime: %i", touch.getMonitorTime());
   // touch.setPowerMode(FOCALTECH_PMODE_ACTIVE);
   // touch.disableINT();
+
+  stk8xxx.STK8xxx_Initialization();
 
   Serial.println("End Setup\n");
 
@@ -107,6 +112,14 @@ void setup() {
 
 uint8_t dacpos1 = 0;
 uint8_t dacpos2 = 0;
+
+void getGSensorData(float *X_DataOut, float *Y_DataOut, float *Z_DataOut)
+{
+    *X_DataOut = 0;
+    *Y_DataOut = 0;
+    *Z_DataOut = 0;
+    stk8xxx.STK8xxx_Getregister_data(X_DataOut, Y_DataOut, Z_DataOut);
+}
 
 void loop() {
   //Serial.printf("Start Loop");
@@ -129,10 +142,13 @@ void loop() {
   // } else {
   //   //Serial.printf("Touched:%i\n", touched);
   // }
-  dacpos1++;
-  dacpos2++;
-  setVoltage(sineLookupTable[dacpos1 & 0x7F],DAC_ADDR_1);
-  delay(20);  
-  setVoltage(sineLookupTable[dacpos2 & 0x7F],DAC_ADDR_2);
+  // dacpos1++;
+  // dacpos2++;
+  // setVoltage(sineLookupTable[dacpos1 & 0x7F],DAC_ADDR_1);
+  // delay(20);  
+  // setVoltage(sineLookupTable[dacpos2 & 0x7F],DAC_ADDR_2);
+  float x,y,z;
+  getGSensorData(&x,&y,&z);
+  Serial.printf("X:%f - Y:%f - Z:%f\n", x,y,z);
   delay(20);  
 }
