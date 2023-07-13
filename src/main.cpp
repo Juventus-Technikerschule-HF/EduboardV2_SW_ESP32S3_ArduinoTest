@@ -8,6 +8,7 @@
 //#include <SD_MMC.h>
 #include "JpegFunc.h"
 #include "focaltech.h"
+#include "dac5571.h"
 
 #define GFX_BL   -1 // default backlight pin, you may replace DF_GFX_BL to actual backlight pin
 #define PIN_RST  8
@@ -17,7 +18,28 @@
 #define PIN_MOSI 13
 #define PIN_MISO 12
 
+#define DAC_ADDR_1  0x4C
+#define DAC_ADDR_2  0x4D
+
 #define JPEG_FILENAME "/eduboard1_arduino.jpeg"
+
+const uint16_t sineLookupTable[] = {
+0x80, 0x86, 0x8c, 0x92, 0x98, 0x9e, 0xa5, 0xaa,
+0xb0, 0xb6, 0xbc, 0xc1, 0xc6, 0xcb, 0xd0, 0xd5,
+0xda, 0xde, 0xe2, 0xe6, 0xea, 0xed, 0xf0, 0xf3,
+0xf5, 0xf8, 0xfa, 0xfb, 0xfd, 0xfe, 0xfe, 0xff,
+0xff, 0xff, 0xfe, 0xfe, 0xfd, 0xfb, 0xfa, 0xf8,
+0xf5, 0xf3, 0xf0, 0xed, 0xea, 0xe6, 0xe2, 0xde,
+0xda, 0xd5, 0xd0, 0xcb, 0xc6, 0xc1, 0xbc, 0xb6,
+0xb0, 0xaa, 0xa5, 0x9e, 0x98, 0x92, 0x8c, 0x86,
+0x80, 0x79, 0x73, 0x6d, 0x67, 0x61, 0x5a, 0x55,
+0x4f, 0x49, 0x43, 0x3e, 0x39, 0x34, 0x2f, 0x2a,
+0x25, 0x21, 0x1d, 0x19, 0x15, 0x12, 0x0f, 0x0c,
+0x0a, 0x07, 0x05, 0x04, 0x02, 0x01, 0x01, 0x00,
+0x00, 0x00, 0x01, 0x01, 0x02, 0x04, 0x05, 0x07,
+0x0a, 0x0c, 0x0f, 0x12, 0x15, 0x19, 0x1d, 0x21,
+0x25, 0x2a, 0x2f, 0x34, 0x39, 0x3e, 0x43, 0x49,
+0x4f, 0x55, 0x5a, 0x61, 0x67, 0x6d, 0x73, 0x79};
 
 /* More data bus class: https://github.com/moononournation/Arduino_GFX/wiki/Data-Bus-Class */
 Arduino_DataBus *bus = new Arduino_ESP32SPI(PIN_DC, PIN_CS, PIN_SCK, PIN_MOSI, PIN_MISO);
@@ -69,12 +91,12 @@ void setup() {
              0 /* x */, 0 /* y */, gfx->width() /* widthLimit */, gfx->height() /* heightLimit */);
     Serial.printf("Time used: %lu\n", millis() - start);
   }
-  Wire.begin(2, 1, 400000);
-  Serial.println("\nStart Touch:\n");
-  Serial.printf("Touch Init: %i\n", touch.begin(Wire, FOCALTECH_SLAVE_ADDRESS));
-  Serial.printf("Touch MonitorTime: %i", touch.getMonitorTime());
-  touch.setPowerMode(FOCALTECH_PMODE_ACTIVE);
-  touch.disableINT();
+  Wire.begin(2, 1, 1000000);
+  // Serial.println("\nStart Touch:\n");
+  // Serial.printf("Touch Init: %i\n", touch.begin(Wire, FOCALTECH_SLAVE_ADDRESS));
+  // Serial.printf("Touch MonitorTime: %i", touch.getMonitorTime());
+  // touch.setPowerMode(FOCALTECH_PMODE_ACTIVE);
+  // touch.disableINT();
 
   Serial.println("End Setup\n");
 
@@ -82,6 +104,9 @@ void setup() {
 
   delay(5000);
 }
+
+uint8_t dacpos1 = 0;
+uint8_t dacpos2 = 0;
 
 void loop() {
   //Serial.printf("Start Loop");
@@ -96,13 +121,18 @@ void loop() {
   // Serial.printf("Total PSRAM: %d\n", ESP.getPsramSize());
   // Serial.printf("Free PSRAM: %d\n", ESP.getFreePsram());
   // delay(1000);
-  uint16_t x,y;
-  touch.getPoint(x,y);
-  uint8_t touched = touch.getTouched();  
-  if(touched > 0) {    
-    Serial.printf("Touched:%i\n>x:%i\n>y:%i\n", touched, x,y);
-  } else {
-    Serial.printf("Touched:%i\n", touched);
-  }
-  delay(10);
+  // uint16_t x,y;
+  // touch.getPoint(x,y);
+  // uint8_t touched = touch.getTouched();  
+  // if(touched > 0) {    
+  //   Serial.printf("Touched:%i\n>x:%i\n>y:%i\n", touched, x,y);
+  // } else {
+  //   //Serial.printf("Touched:%i\n", touched);
+  // }
+  dacpos1++;
+  dacpos2++;
+  setVoltage(sineLookupTable[dacpos1 & 0x7F],DAC_ADDR_1);
+  delay(20);  
+  setVoltage(sineLookupTable[dacpos2 & 0x7F],DAC_ADDR_2);
+  delay(20);  
 }
