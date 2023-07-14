@@ -12,6 +12,8 @@
 #include "stk8baxx.h"
 #include "RTClib.h"
 
+#include <Encoder.h>
+
 #define GFX_BL   -1 // default backlight pin, you may replace DF_GFX_BL to actual backlight pin
 #define PIN_RST  8
 #define PIN_DC   16
@@ -19,6 +21,10 @@
 #define PIN_SCK  14
 #define PIN_MOSI 13
 #define PIN_MISO 12
+
+#define PIN_ROTENC_A  41
+#define PIN_ROTENC_B  40
+#define PIN_ROTENC_SW 39
 
 #define DAC_ADDR_1  0x4C
 #define DAC_ADDR_2  0x4D
@@ -55,6 +61,8 @@ FocalTech_Class touch;
 STK8xxx stk8xxx;
 
 RTC_PCF8563 rtc;
+
+Encoder rotenc1(PIN_ROTENC_A, PIN_ROTENC_B);
 
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
@@ -100,11 +108,11 @@ void setup() {
     Serial.printf("Time used: %lu\n", millis() - start);
   }
   Wire.begin(2, 1, 400000);
-  // Serial.println("\nStart Touch:\n");
-  // Serial.printf("Touch Init: %i\n", touch.begin(Wire, FOCALTECH_SLAVE_ADDRESS));
-  // Serial.printf("Touch MonitorTime: %i", touch.getMonitorTime());
-  // touch.setPowerMode(FOCALTECH_PMODE_ACTIVE);
-  // touch.disableINT();
+  Serial.println("\nStart Touch:\n");
+  Serial.printf("Touch Init: %i\n", touch.begin(Wire, FOCALTECH_SLAVE_ADDRESS));
+  Serial.printf("Touch MonitorTime: %i", touch.getMonitorTime());
+  touch.setPowerMode(FOCALTECH_PMODE_ACTIVE);
+  touch.disableINT();
 
   stk8xxx.STK8xxx_Initialization();
 
@@ -126,8 +134,7 @@ void setup() {
   delay(5000);
 }
 
-uint8_t dacpos1 = 0;
-uint8_t dacpos2 = 0;
+
 
 void getGSensorData(float *X_DataOut, float *Y_DataOut, float *Z_DataOut)
 {
@@ -181,8 +188,52 @@ void rtctest() {
   Serial.println();
 }
 
+void getTouch() {
+  uint16_t x,y;
+  touch.getPoint(x,y);
+  uint8_t touched = touch.getTouched();  
+  if(touched > 0) {    
+    Serial.printf("Touched:%i\n>x:%i\n>y:%i\n", touched, x,y);
+  } else {
+    //Serial.printf("Touched:%i\n", touched);
+  }
+}
+
+uint8_t dacpos1 = 0;
+uint8_t dacpos2 = 0;
+void writeDAC() {
+  dacpos1++;
+  dacpos2++;
+  setVoltage(sineLookupTable[dacpos1 & 0x7F],DAC_ADDR_1);
+  delay(20);  
+  setVoltage(sineLookupTable[dacpos2 & 0x7F],DAC_ADDR_2);
+}
+
+void getGSensor() {
+  float x,y,z;
+  getGSensorData(&x,&y,&z);
+  Serial.printf("X:%f - Y:%f - Z:%f\n", x,y,z);
+}
+
+long positionRotEnc1  = -999;
+void rotEncUpdate() {
+  long newEnc;
+  newEnc = rotenc1.read();
+  if (newEnc != positionRotEnc1) {
+    Serial.print("RotEnc = ");
+    Serial.print(newEnc);
+    Serial.println();
+    positionRotEnc1 = newEnc;
+  }
+  // if a character is sent from the serial monitor,
+  // reset both back to zero.
+  if (Serial.available()) {
+    Serial.read();
+    Serial.println("Reset both knobs to zero");
+    rotenc1.write(0);
+  }
+}
 void loop() {
-  //Serial.printf("Start Loop");
   // int w = gfx->width();
   // int h = gfx->height();
 
@@ -194,23 +245,14 @@ void loop() {
   // Serial.printf("Total PSRAM: %d\n", ESP.getPsramSize());
   // Serial.printf("Free PSRAM: %d\n", ESP.getFreePsram());
   // delay(1000);
-  // uint16_t x,y;
-  // touch.getPoint(x,y);
-  // uint8_t touched = touch.getTouched();  
-  // if(touched > 0) {    
-  //   Serial.printf("Touched:%i\n>x:%i\n>y:%i\n", touched, x,y);
-  // } else {
-  //   //Serial.printf("Touched:%i\n", touched);
-  // }
-  // dacpos1++;
-  // dacpos2++;
-  // setVoltage(sineLookupTable[dacpos1 & 0x7F],DAC_ADDR_1);
-  // delay(20);  
-  // setVoltage(sineLookupTable[dacpos2 & 0x7F],DAC_ADDR_2);
-  // float x,y,z;
-  // getGSensorData(&x,&y,&z);
-  // Serial.printf("X:%f - Y:%f - Z:%f\n", x,y,z);
+  
+  //getTouch();
+  
+  //writeDAC();
 
-  rtctest();
-  delay(2000);  
+  getGSensor();
+
+  //rtctest();
+  //rotEncUpdate();
+  //delay(2000);  
 }
