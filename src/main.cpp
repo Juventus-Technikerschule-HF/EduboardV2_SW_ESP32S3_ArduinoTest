@@ -12,7 +12,34 @@
 #include "stk8baxx.h"
 #include "RTClib.h"
 
+#include "DFRobot_Alcohol.h"
+
 #include <Encoder.h>
+
+#define COLLECT_NUMBER   5                      // collect number, the collection range is 1-100
+#define ALCOHOL_I2C_ADDRESS ALCOHOL_ADDRESS_3
+/*   iic slave Address, The default is ADDRESS_3
+       ADDRESS_0               0x72             // i2c device address
+       ADDRESS_1               0x73
+       ADDRESS_2               0x74
+       ADDRESS_3               0x75
+*/
+
+
+/*
+#ifdef ESP_PLATFORM
+  // ESP32 user hardware uart
+  // RX io16
+  // TX io17
+  DFRobot_Alcohol_UART Alcohol(&Serial2 ,9600);
+#else
+  // Arduino user software uart
+  // RX io10
+  // TX io11
+  SoftwareSerial              mySerial(10 ,11);
+  DFRobot_Alcohol_UART Alcohol(&mySerial ,9600);
+#endif
+*/
 
 #define GFX_BL   -1 // default backlight pin, you may replace DF_GFX_BL to actual backlight pin
 #define PIN_RST  8
@@ -55,6 +82,8 @@ Arduino_DataBus *bus = new Arduino_ESP32SPI(PIN_DC, PIN_CS, PIN_SCK, PIN_MOSI, P
 /* More display class: https://github.com/moononournation/Arduino_GFX/wiki/Display-Class */
 //Arduino_GFX *gfx = new Arduino_ILI9488(bus, PIN_RST, 3 /* rotation */, false /* IPS */);
 Arduino_GFX *gfx = new Arduino_ILI9488_18bit(bus, PIN_RST /* RST */, 1 /* rotation */, false /* IPS */);
+
+DFRobot_Alcohol_I2C Alcohol(&Wire ,ALCOHOL_I2C_ADDRESS);
 
 FocalTech_Class touch;
 
@@ -126,6 +155,19 @@ void setup() {
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
   rtc.start();
+
+  while(!Alcohol.begin())
+  {
+    Serial.println("NO Deivces !");
+    delay(1000);
+  }
+  Serial.println("Device connected successfully !");
+
+  /*  Set iic mode, active mode or passive mode
+        MEASURE_MODE_AUTOMATIC            // active  mode
+        MEASURE_MODE_PASSIVE              // passive mode
+  */
+  Alcohol.setModes(MEASURE_MODE_AUTOMATIC);
 
   Serial.println("End Setup\n");
 
@@ -233,6 +275,24 @@ void rotEncUpdate() {
     rotenc1.write(0);
   }
 }
+
+void getAlcoholConcentration() {
+  float alcoholConcentration = Alcohol.readAlcoholData(COLLECT_NUMBER);
+  if(alcoholConcentration == ERROR)
+  {
+    Serial.println("Please check the connection !");
+  }else{
+    Serial.print("Alcohol concentration is ");
+    Serial.print(alcoholConcentration);
+    Serial.println(" PPM.");
+  }
+  gfx->setTextSize(2);
+  gfx->setCursor(0,0);
+  gfx->fillRect(0, 0, 400, 20, BLACK);
+  gfx->printf("Alcohol: %.3f PPM", alcoholConcentration);
+  delay(100);
+}
+
 void loop() {
   // int w = gfx->width();
   // int h = gfx->height();
@@ -250,7 +310,9 @@ void loop() {
   
   //writeDAC();
 
-  getGSensor();
+  //getGSensor();
+
+  getAlcoholConcentration();
 
   //rtctest();
   //rotEncUpdate();
